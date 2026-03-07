@@ -1,15 +1,15 @@
 'use client';
 
 /**
- * Admin-Only Layout Guard
- * Protects all routes under /dashboard/project/* 
- * Redirects non-admins back to the dashboard main page.
+ * حارس الصلاحيات — /dashboard/project/*
+ * يحمي جميع صفحات إعدادات المشاريع ويسمح فقط للمديرين.
  */
 
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
 import { ShieldAlert } from 'lucide-react';
+import { Spinner } from '@/components/ui/Spinner';
 
 export default function AdminOnlyLayout({ children }: { children: React.ReactNode }) {
     const router = useRouter();
@@ -26,13 +26,11 @@ export default function AdminOnlyLayout({ children }: { children: React.ReactNod
                 .eq('id', user.id)
                 .single();
 
-            // Allow if profile role is admin OR if env fallback email matches
-            if (profile?.role === 'admin' || user.email === process.env.NEXT_PUBLIC_ADMIN_EMAIL) {
+            if (profile?.role === 'admin') {
                 setStatus('authorized');
             } else {
                 setStatus('denied');
-                // Auto-redirect after 2 seconds
-                setTimeout(() => router.push('/dashboard'), 2000);
+                router.replace('/dashboard/distributor');
             }
         };
         check();
@@ -41,7 +39,7 @@ export default function AdminOnlyLayout({ children }: { children: React.ReactNod
     if (status === 'checking') {
         return (
             <div className="flex items-center justify-center min-h-[60vh]">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
+                <Spinner size="lg" className="text-blue-500" />
             </div>
         );
     }
@@ -49,14 +47,12 @@ export default function AdminOnlyLayout({ children }: { children: React.ReactNod
     if (status === 'denied') {
         return (
             <div className="flex items-center justify-center min-h-[60vh]">
-                <div className="bg-white rounded-2xl p-10 text-center shadow-sm border border-red-100 max-w-sm animate-scale-in">
-                    <div className="w-16 h-16 bg-red-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                        <ShieldAlert className="w-8 h-8 text-red-500" />
+                <div className="card p-10 text-center max-w-sm">
+                    <div className="w-14 h-14 bg-red-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                        <ShieldAlert className="w-7 h-7 text-red-500" />
                     </div>
-                    <h2 className="text-xl font-bold text-gray-900 mb-2">غير مصرح لك بالوصول</h2>
-                    <p className="text-gray-500 text-sm">
-                        هذه الصفحة مخصصة للمديرين فقط. سيتم تحويلك تلقائياً...
-                    </p>
+                    <h2 className="text-lg font-bold text-slate-900 mb-1">غير مصرح بالوصول</h2>
+                    <p className="text-slate-500 text-sm">هذه الصفحة للمديرين فقط. جاري التحويل…</p>
                 </div>
             </div>
         );

@@ -2,36 +2,35 @@
 
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
-import { useParams, useRouter } from 'next/navigation';
-import { ArrowRight, Search, FileDown, ArrowUpDown, CheckCircle, Clock, CreditCard, Users } from 'lucide-react';
+import { useParams } from 'next/navigation';
+import { Search, FileDown, ArrowUpDown, CheckCircle, Clock, CreditCard, Users } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import toast, { Toaster } from 'react-hot-toast';
+import { formatNumber } from '@/lib/utils';
+import { PAGINATION_STEP } from '@/lib/constants';
+import { PageHeader } from '@/components/ui/PageHeader';
+import { Spinner } from '@/components/ui/Spinner';
 
 type Tab = 'received' | 'pending' | 'unused_cards';
 
 export default function ComprehensiveReportPage() {
     const { id: projectId } = useParams();
-    const router = useRouter();
 
     const [projectConfig, setProjectConfig] = useState<any>(null);
     const [stats, setStats] = useState({ totalBeni: 0, receivedBeni: 0, pendingBeni: 0, availableCards: 0 });
 
-    // Data States
     const [receivedBeni, setReceivedBeni] = useState<any[]>([]);
     const [pendingBeni, setPendingBeni] = useState<any[]>([]);
     const [unusedCards, setUnusedCards] = useState<any[]>([]);
 
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState<Tab>('received');
-
-    // Filters and Sorting
     const [searchQuery, setSearchQuery] = useState('');
     const [sortField, setSortField] = useState('name');
     const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
 
     useEffect(() => {
         fetchData();
-        // Set default sorting based on tab
         if (activeTab === 'received') setSortField('received_at');
         else if (activeTab === 'unused_cards') setSortField('card_number');
         else setSortField('name');
@@ -40,20 +39,17 @@ export default function ComprehensiveReportPage() {
     const fetchAllRecords = async (table: string, selectDef: string, conditions: Record<string, string>) => {
         let allData: any[] = [];
         let from = 0;
-        const step = 999;
-
         while (true) {
-            let query = supabase.from(table).select(selectDef).range(from, from + step);
+            let query = supabase.from(table).select(selectDef).range(from, from + PAGINATION_STEP);
             for (const [key, value] of Object.entries(conditions)) {
                 query = query.eq(key, value);
             }
             const { data, error } = await query;
             if (error) throw error;
             if (!data || data.length === 0) break;
-
             allData = allData.concat(data);
-            if (data.length <= step) break; // Reached the end
-            from += step + 1;
+            if (data.length <= PAGINATION_STEP) break;
+            from += PAGINATION_STEP + 1;
         }
         return allData;
     };
@@ -61,58 +57,33 @@ export default function ComprehensiveReportPage() {
     const fetchData = async () => {
         try {
             setLoading(true);
-
-            // 1. Fetch Project Config
             const { data: proj, error: projError } = await supabase
                 .from('projects')
                 .select('name, requires_cards, cards_per_beneficiary')
                 .eq('id', projectId)
                 .single();
-
             if (projError) throw projError;
             setProjectConfig(proj);
 
-            // 2. Fetch Received Beneficiaries (with pagination)
-            const receivedData = await fetchAllRecords(
-                'beneficiaries',
-                'id, name, identity_number, phone_number, received_at, assigned_cards_count, distributed_by_name, cards ( card_number )',
-                { project_id: projectId as string, status: 'received' }
-            );
-            const formattedReceived = (receivedData || []).map(b => ({
-                ...b,
-                card_numbers: b.cards ? b.cards.map((c: any) => c.card_number).join(' ، ') : ''
-            }));
-            setReceivedBeni(formattedReceived);
+            const receivedData = await fetchAllRecords('beneficiaries', 'id, name, identity_number, phone_number, received_at, assigned_cards_count, distributed_by_name, cards ( card_number )', { project_id: projectId as string, status: 'received' });
+            setReceivedBeni((receivedData || []).map(b => ({ ...b, card_numbers: b.cards ? b.cards.map((c: any) => c.card_number).join(' ، ') : '' })));
 
-            // 3. Fetch Pending Beneficiaries (with pagination)
-            const pendingData = await fetchAllRecords(
-                'beneficiaries',
-                'id, name, identity_number, phone_number, assigned_cards_count',
-                { project_id: projectId as string, status: 'pending' }
-            );
+            const pendingData = await fetchAllRecords('beneficiaries', 'id, name, identity_number, phone_number, assigned_cards_count', { project_id: projectId as string, status: 'pending' });
             setPendingBeni(pendingData || []);
 
-            // 4. Fetch Unused Cards (if project requires cards)
             let availableCardsData: any[] = [];
             if (proj.requires_cards) {
-                const cardsData = await fetchAllRecords(
-                    'cards',
-                    'id, card_number, value',
-                    { project_id: projectId as string, status: 'available' }
-                );
-                availableCardsData = cardsData || [];
+                availableCardsData = await fetchAllRecords('cards', 'id, card_number, value', { project_id: projectId as string, status: 'available' });
                 setUnusedCards(availableCardsData);
             }
 
-            // Calculate Stats
             setStats({
                 totalBeni: (receivedData?.length || 0) + (pendingData?.length || 0),
                 receivedBeni: receivedData?.length || 0,
                 pendingBeni: pendingData?.length || 0,
                 availableCards: availableCardsData.length
             });
-
-        } catch (error: any) {
+        } catch {
             toast.error('حدث خطأ أثناء جلب التقارير');
         } finally {
             setLoading(false);
@@ -120,48 +91,25 @@ export default function ComprehensiveReportPage() {
     };
 
     const handleSort = (field: string) => {
-        if (sortField === field) {
-            setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
-        } else {
-            setSortField(field);
-            setSortDirection(field === 'received_at' ? 'desc' : 'asc');
-        }
+        if (sortField === field) setSortDirection(d => d === 'asc' ? 'desc' : 'asc');
+        else { setSortField(field); setSortDirection(field === 'received_at' ? 'desc' : 'asc'); }
     };
 
     const getSortedAndFilteredData = () => {
-        let currentData = [];
-        if (activeTab === 'received') currentData = receivedBeni;
-        else if (activeTab === 'pending') currentData = pendingBeni;
-        else currentData = unusedCards;
-
+        let currentData = activeTab === 'received' ? receivedBeni : activeTab === 'pending' ? pendingBeni : unusedCards;
         return currentData
             .filter(item => {
                 if (!searchQuery) return true;
-                const lowerQ = searchQuery.toLowerCase();
-
-                if (activeTab === 'unused_cards') {
-                    return item.card_number && item.card_number.includes(lowerQ);
-                }
-
-                return (
-                    (item.name && item.name.toLowerCase().includes(lowerQ)) ||
-                    (item.identity_number && item.identity_number.includes(lowerQ)) ||
-                    (item.phone_number && item.phone_number.includes(lowerQ)) ||
-                    (item.card_numbers && item.card_numbers.includes(lowerQ))
-                );
+                const q = searchQuery.toLowerCase();
+                if (activeTab === 'unused_cards') return item.card_number && item.card_number.includes(q);
+                return (item.name && item.name.toLowerCase().includes(q)) || (item.identity_number && item.identity_number.includes(q)) || (item.phone_number && item.phone_number.includes(q)) || (item.card_numbers && item.card_numbers.includes(q));
             })
             .sort((a, b) => {
-                let comparison = 0;
-
-                if (activeTab === 'unused_cards') {
-                    comparison = (a[sortField] || '').localeCompare(b[sortField] || '');
-                } else if (sortField === 'received_at' && a.received_at && b.received_at) {
-                    comparison = new Date(a.received_at).getTime() - new Date(b.received_at).getTime();
-                } else {
-                    comparison = (a[sortField] || '').localeCompare(b[sortField] || '', 'ar');
-                }
-
-                return sortDirection === 'asc' ? comparison : -comparison;
+                let cmp = 0;
+                if (activeTab === 'unused_cards') cmp = (a[sortField] || '').localeCompare(b[sortField] || '');
+                else if (sortField === 'received_at' && a.received_at && b.received_at) cmp = new Date(a.received_at).getTime() - new Date(b.received_at).getTime();
+                else cmp = (a[sortField] || '').localeCompare(b[sortField] || '', 'ar');
+                return sortDirection === 'asc' ? cmp : -cmp;
             });
     };
 
@@ -169,34 +117,24 @@ export default function ComprehensiveReportPage() {
         const filteredData = getSortedAndFilteredData();
         let dataToExport: any[] = [];
         let sheetName = '';
-
         if (activeTab === 'received') {
             sheetName = 'المستلمين';
             dataToExport = filteredData.map(b => ({
                 'اسم المستفيد': b.name,
                 'الهوية': b.identity_number,
                 'الجوال': b.phone_number || '',
-                'تاريخ ووقت الاستلام': b.received_at ? new Date(b.received_at).toLocaleString('ar-SA') : '',
-                'الموزع (المسلم)': b.distributed_by_name || 'المدير',
-                'الكمية المستلمة': b.assigned_cards_count || projectConfig?.cards_per_beneficiary || 0,
+                'تاريخ الاستلام': b.received_at ? new Date(b.received_at).toLocaleString('ar-SA') : '',
+                'الموزع': b.distributed_by_name || 'المدير',
+                'الكمية': b.assigned_cards_count || projectConfig?.cards_per_beneficiary || 0,
                 'أرقام البطاقات': b.card_numbers || 'لا توجد',
             }));
         } else if (activeTab === 'pending') {
             sheetName = 'المتبقين';
-            dataToExport = filteredData.map(b => ({
-                'اسم المستفيد': b.name,
-                'الهوية': b.identity_number,
-                'الجوال': b.phone_number || '',
-                'الكمية المستحقة': b.assigned_cards_count || projectConfig?.cards_per_beneficiary || 0,
-            }));
+            dataToExport = filteredData.map(b => ({ 'اسم المستفيد': b.name, 'الهوية': b.identity_number, 'الجوال': b.phone_number || '', 'الكمية المستحقة': b.assigned_cards_count || projectConfig?.cards_per_beneficiary || 0 }));
         } else {
             sheetName = 'البطاقات_المتبقية';
-            dataToExport = filteredData.map(c => ({
-                'رقم البطاقة': c.card_number,
-                'قيمة/فئة البطاقة': c.value || '-',
-            }));
+            dataToExport = filteredData.map(c => ({ 'رقم البطاقة': c.card_number, 'القيمة': c.value || '-' }));
         }
-
         const worksheet = XLSX.utils.json_to_sheet(dataToExport);
         const workbook = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
@@ -205,177 +143,167 @@ export default function ComprehensiveReportPage() {
 
     const filteredData = getSortedAndFilteredData();
 
+    const SortIcon = ({ field }: { field: string }) => (
+        <ArrowUpDown className={`w-3 h-3 inline ml-1 ${sortField === field ? 'text-blue-600' : 'text-slate-300'}`} />
+    );
+
+    const tabs = [
+        { id: 'received' as Tab, label: 'المستلمين', icon: CheckCircle, color: 'blue' },
+        { id: 'pending' as Tab, label: 'المتبقين', icon: Clock, color: 'amber' },
+        ...(projectConfig?.requires_cards !== false ? [{ id: 'unused_cards' as Tab, label: 'البطاقات المتبقية', icon: CreditCard, color: 'purple' }] : []),
+    ];
+
     return (
-        <div className="space-y-6 max-w-7xl mx-auto pb-10">
+        <div className="space-y-5 pb-10">
             <Toaster position="top-center" />
 
-            {/* Header & Stats Overview */}
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 space-y-6">
-                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                    <div className="flex items-center gap-4">
-                        <button onClick={() => router.push('/dashboard/reports')} className="text-gray-500 hover:text-gray-900 p-2 bg-gray-50 rounded-lg border shadow-sm">
-                            <ArrowRight className="w-5 h-5" />
-                        </button>
-                        <div>
-                            <h1 className="text-2xl font-bold text-gray-900">المركز الشامل للتقارير</h1>
-                            <p className="text-blue-600 font-medium text-sm mt-1">{projectConfig?.name}</p>
-                        </div>
-                    </div>
-                </div>
+            <PageHeader
+                title="التقرير الشامل"
+                description={projectConfig?.name}
+                backHref="/dashboard/reports"
+            />
 
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
-                    <div className="bg-blue-50 p-4 rounded-xl border border-blue-100">
-                        <p className="text-blue-600 text-sm font-semibold flex items-center gap-1"><Users className="w-4 h-4" /> إجمالي الأسماء</p>
-                        <p className="text-2xl font-bold text-gray-900 mt-1">{stats.totalBeni}</p>
+            {/* Stats */}
+            <div className={`grid grid-cols-2 gap-3 ${projectConfig?.requires_cards !== false ? 'md:grid-cols-4' : 'md:grid-cols-3'}`}>
+                {[
+                    { label: 'إجمالي الأسماء', value: stats.totalBeni, icon: <Users className="w-4 h-4" />, bg: 'bg-blue-50 text-blue-700 border-blue-100' },
+                    { label: 'تم التسليم', value: stats.receivedBeni, icon: <CheckCircle className="w-4 h-4" />, bg: 'bg-emerald-50 text-emerald-700 border-emerald-100' },
+                    { label: 'متبقي (لم يستلم)', value: stats.pendingBeni, icon: <Clock className="w-4 h-4" />, bg: 'bg-amber-50 text-amber-700 border-amber-100' },
+                    ...(projectConfig?.requires_cards !== false ? [{ label: 'بطاقات غير مستخدمة', value: stats.availableCards, icon: <CreditCard className="w-4 h-4" />, bg: 'bg-violet-50 text-violet-700 border-violet-100' }] : []),
+                ].map(s => (
+                    <div key={s.label} className={`${s.bg} border rounded-xl p-3.5`}>
+                        <p className="text-sm font-semibold flex items-center gap-1.5">{s.icon} {s.label}</p>
+                        <p className="text-2xl font-bold text-slate-900 mt-1">{formatNumber(s.value)}</p>
                     </div>
-                    <div className="bg-green-50 p-4 rounded-xl border border-green-100">
-                        <p className="text-green-700 text-sm font-semibold flex items-center gap-1"><CheckCircle className="w-4 h-4" /> تم التسليم</p>
-                        <p className="text-2xl font-bold text-gray-900 mt-1">{stats.receivedBeni}</p>
-                    </div>
-                    <div className="bg-orange-50 p-4 rounded-xl border border-orange-100">
-                        <p className="text-orange-700 text-sm font-semibold flex items-center gap-1"><Clock className="w-4 h-4" /> متبقي (لم يستلم)</p>
-                        <p className="text-2xl font-bold text-gray-900 mt-1">{stats.pendingBeni}</p>
-                    </div>
-                    {projectConfig?.requires_cards !== false && (
-                        <div className="bg-purple-50 p-4 rounded-xl border border-purple-100">
-                            <p className="text-purple-700 text-sm font-semibold flex items-center gap-1"><CreditCard className="w-4 h-4" /> بطاقات غير مستخدمة</p>
-                            <p className="text-2xl font-bold text-gray-900 mt-1">{stats.availableCards}</p>
-                        </div>
-                    )}
-                </div>
+                ))}
             </div>
 
             {/* Tabs & Controls */}
-            <div className="flex flex-col lg:flex-row gap-4 justify-between items-start lg:items-center">
-                <div className="flex bg-white p-1 rounded-xl shadow-sm border border-gray-100 w-full lg:w-auto">
-                    <button
-                        onClick={() => { setActiveTab('received'); setSearchQuery(''); }}
-                        className={`flex-1 lg:flex-none flex items-center justify-center gap-2 px-6 py-2.5 rounded-lg text-sm font-medium transition-all ${activeTab === 'received' ? 'bg-blue-600 text-white shadow-md' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900'}`}
-                    >
-                        <CheckCircle className="w-4 h-4" /> المستلمين
-                    </button>
-                    <button
-                        onClick={() => { setActiveTab('pending'); setSearchQuery(''); }}
-                        className={`flex-1 lg:flex-none flex items-center justify-center gap-2 px-6 py-2.5 rounded-lg text-sm font-medium transition-all ${activeTab === 'pending' ? 'bg-orange-500 text-white shadow-md' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900'}`}
-                    >
-                        <Clock className="w-4 h-4" /> المتبقين للتواصل
-                    </button>
-                    {projectConfig?.requires_cards !== false && (
-                        <button
-                            onClick={() => { setActiveTab('unused_cards'); setSearchQuery(''); }}
-                            className={`flex-1 lg:flex-none flex items-center justify-center gap-2 px-6 py-2.5 rounded-lg text-sm font-medium transition-all ${activeTab === 'unused_cards' ? 'bg-purple-600 text-white shadow-md' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900'}`}
-                        >
-                            <CreditCard className="w-4 h-4" /> البطاقات المتبقية
-                        </button>
-                    )}
+            <div className="flex flex-col sm:flex-row gap-3 justify-between items-start sm:items-center">
+                <div className="flex bg-white p-1 rounded-xl shadow-sm border border-slate-200 gap-0.5">
+                    {tabs.map(tab => {
+                        const Icon = tab.icon;
+                        const isActive = activeTab === tab.id;
+                        const activeColors: Record<string, string> = { blue: 'bg-blue-600 text-white', amber: 'bg-amber-500 text-white', purple: 'bg-violet-600 text-white' };
+                        return (
+                            <button
+                                key={tab.id}
+                                onClick={() => { setActiveTab(tab.id); setSearchQuery(''); }}
+                                className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-all ${isActive ? activeColors[tab.color] : 'text-slate-500 hover:bg-slate-50 hover:text-slate-800'}`}
+                            >
+                                <Icon className="w-4 h-4" />
+                                {tab.label}
+                            </button>
+                        );
+                    })}
                 </div>
 
-                <div className="flex items-center gap-3 w-full lg:w-auto">
-                    <div className="relative flex-1 lg:w-64">
+                <div className="flex items-center gap-2 w-full sm:w-auto">
+                    <div className="relative flex-1 sm:w-56">
+                        <Search className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2" />
                         <input
                             type="text"
-                            placeholder={activeTab === 'unused_cards' ? 'ابحث برقم البطاقة...' : 'بحث بالاسم، الهوية، الجوال...'}
+                            placeholder={activeTab === 'unused_cards' ? 'رقم البطاقة...' : 'بحث بالاسم أو الهوية...'}
                             value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                            className="w-full pl-10 pr-4 py-2 border rounded-xl focus:ring-blue-500 focus:border-blue-500 text-sm shadow-sm"
+                            onChange={e => setSearchQuery(e.target.value)}
+                            className="input-field pr-9"
                         />
-                        <Search className="w-4 h-4 text-gray-400 absolute left-3 top-3" />
                     </div>
-                    <button onClick={exportToExcel} className="bg-green-600 hover:bg-green-700 text-white px-5 py-2 rounded-xl flex items-center justify-center gap-2 text-sm font-medium whitespace-nowrap transition-colors shadow-sm">
+                    <button
+                        onClick={exportToExcel}
+                        className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2.5 rounded-[10px] flex items-center gap-2 text-sm font-semibold whitespace-nowrap transition-colors shadow-sm"
+                    >
                         <FileDown className="w-4 h-4" />
-                        <span className="hidden sm:inline">تصدير (إكسل)</span>
+                        تصدير
                     </button>
                 </div>
             </div>
 
             {/* Data Table */}
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-                <div className="overflow-x-auto min-h-[400px]">
-                    <table className="min-w-full text-sm text-right text-gray-600">
-                        <thead className="bg-gray-50 text-gray-700 border-b border-gray-100">
+            <div className="card overflow-hidden">
+                <div className="overflow-x-auto">
+                    <table className="data-table min-w-full text-right">
+                        <thead>
                             {activeTab !== 'unused_cards' ? (
                                 <tr>
-                                    <th scope="col" className="px-6 py-4 font-semibold cursor-pointer hover:bg-gray-100 transition whitespace-nowrap" onClick={() => handleSort('name')}>
-                                        <div className="flex items-center gap-1">اسم المستفيد <ArrowUpDown className={`w-3 h-3 ${sortField === 'name' ? 'text-blue-600' : 'text-gray-400'}`} /></div>
+                                    <th className="cursor-pointer hover:bg-slate-100 transition" onClick={() => handleSort('name')}>
+                                        اسم المستفيد <SortIcon field="name" />
                                     </th>
-                                    <th scope="col" className="px-6 py-4 font-semibold whitespace-nowrap">رقم الهوية</th>
-                                    <th scope="col" className="px-6 py-4 font-semibold whitespace-nowrap">رقم الجوال</th>
-                                    <th scope="col" className="px-6 py-4 font-semibold text-center whitespace-nowrap">الكمية/النصاب</th>
-
+                                    <th>رقم الهوية</th>
+                                    <th>رقم الجوال</th>
+                                    <th className="text-center">الكمية</th>
                                     {activeTab === 'received' && (
                                         <>
-                                            <th scope="col" className="px-6 py-4 font-semibold cursor-pointer hover:bg-gray-100 transition whitespace-nowrap" onClick={() => handleSort('received_at')}>
-                                                <div className="flex items-center gap-1">وقت الاستلام <ArrowUpDown className={`w-3 h-3 ${sortField === 'received_at' ? 'text-blue-600' : 'text-gray-400'}`} /></div>
+                                            <th className="cursor-pointer hover:bg-slate-100 transition" onClick={() => handleSort('received_at')}>
+                                                وقت الاستلام <SortIcon field="received_at" />
                                             </th>
-                                            <th scope="col" className="px-6 py-4 font-semibold whitespace-nowrap text-blue-700 bg-blue-50/50">بواسطة (الموزع)</th>
-                                            {projectConfig?.requires_cards !== false && (
-                                                <th scope="col" className="px-6 py-4 font-semibold whitespace-nowrap">أرقام البطاقات</th>
-                                            )}
+                                            <th>الموزع</th>
+                                            {projectConfig?.requires_cards !== false && <th>أرقام البطاقات</th>}
                                         </>
                                     )}
                                 </tr>
                             ) : (
                                 <tr>
-                                    <th scope="col" className="px-6 py-4 font-semibold cursor-pointer hover:bg-gray-100 transition" onClick={() => handleSort('card_number')}>
-                                        <div className="flex items-center gap-1">رقم البطاقة <ArrowUpDown className={`w-3 h-3 ${sortField === 'card_number' ? 'text-blue-600' : 'text-gray-400'}`} /></div>
+                                    <th className="cursor-pointer hover:bg-slate-100 transition" onClick={() => handleSort('card_number')}>
+                                        رقم البطاقة <SortIcon field="card_number" />
                                     </th>
-                                    <th scope="col" className="px-6 py-4 font-semibold">فئة/قيمة البطاقة</th>
+                                    <th>الفئة/القيمة</th>
                                 </tr>
                             )}
                         </thead>
-                        <tbody className="divide-y divide-gray-50">
+                        <tbody>
                             {loading ? (
                                 <tr>
-                                    <td colSpan={6} className="px-6 py-12 text-center text-gray-500">
-                                        <div className="animate-spin w-8 h-8 border-2 border-blue-600 border-t-transparent flex mx-auto rounded-full mb-2"></div>
-                                        جاري جلب البيانات...
+                                    <td colSpan={8} className="py-14 text-center">
+                                        <Spinner size="md" className="text-blue-500 mx-auto mb-2" />
+                                        <p className="text-slate-500 text-sm mt-2">جاري جلب البيانات...</p>
                                     </td>
                                 </tr>
                             ) : filteredData.length === 0 ? (
                                 <tr>
-                                    <td colSpan={6} className="px-6 py-12 text-center text-gray-500">
-                                        لا توجد بيانات متاحة في هذا التقرير.
+                                    <td colSpan={8} className="py-14 text-center text-slate-400 text-sm">
+                                        لا توجد بيانات متاحة
                                     </td>
                                 </tr>
-                            ) : (
-                                filteredData.map((row) => (
-                                    <tr key={row.id} className="hover:bg-blue-50/30 transition-colors">
-                                        {activeTab !== 'unused_cards' ? (
-                                            <>
-                                                <td className="px-6 py-4 font-bold text-gray-900 border-l border-gray-100 whitespace-nowrap">{row.name}</td>
-                                                <td className="px-6 py-4 font-mono text-gray-500 border-l border-gray-100 whitespace-nowrap">{row.identity_number}</td>
-                                                <td className="px-6 py-4 border-l border-gray-100 whitespace-nowrap" dir="ltr">{row.phone_number || '-'}</td>
-                                                <td className="px-6 py-4 text-center border-l border-gray-100 whitespace-nowrap">
-                                                    <span className={`${activeTab === 'received' ? 'bg-blue-100 text-blue-800' : 'bg-orange-100 text-orange-800'} font-bold px-3 py-1 rounded-md text-xs`}>
-                                                        {row.assigned_cards_count || projectConfig?.cards_per_beneficiary || '-'}
-                                                    </span>
-                                                </td>
-                                                {activeTab === 'received' && (
-                                                    <>
-                                                        <td className="px-6 py-4 text-xs font-medium text-gray-500 border-l border-gray-100 whitespace-nowrap" dir="ltr">{row.received_at ? new Date(row.received_at).toLocaleString('ar-SA') : '-'}</td>
-                                                        <td className="px-6 py-4 text-xs font-bold text-blue-700 bg-blue-50/30 border-l border-gray-100 whitespace-nowrap">{row.distributed_by_name || 'المدير'}</td>
-                                                        {projectConfig?.requires_cards !== false && (
-                                                            <td className="px-6 py-4 font-mono text-xs text-gray-800 whitespace-nowrap border-l border-gray-100 max-w-[200px] truncate" title={row.card_numbers}>
-                                                                {row.card_numbers ? row.card_numbers : <span className="text-gray-400">-</span>}
-                                                            </td>
-                                                        )}
-                                                    </>
-                                                )}
-                                            </>
-                                        ) : (
-                                            <>
-                                                <td className="px-6 py-4 font-mono font-bold text-purple-700 border-l border-gray-50 text-lg">{row.card_number}</td>
-                                                <td className="px-6 py-4 border-l border-gray-50">{row.value || '-'}</td>
-                                            </>
-                                        )}
-                                    </tr>
-                                ))
-                            )}
+                            ) : filteredData.map(row => (
+                                <tr key={row.id}>
+                                    {activeTab !== 'unused_cards' ? (
+                                        <>
+                                            <td className="font-semibold text-slate-900">{row.name}</td>
+                                            <td className="font-mono text-slate-500">{row.identity_number}</td>
+                                            <td dir="ltr" className="text-slate-500">{row.phone_number || '—'}</td>
+                                            <td className="text-center">
+                                                <span className={`inline-block px-2.5 py-0.5 rounded-md text-xs font-bold ${activeTab === 'received' ? 'bg-blue-100 text-blue-800' : 'bg-amber-100 text-amber-800'}`}>
+                                                    {row.assigned_cards_count || projectConfig?.cards_per_beneficiary || '—'}
+                                                </span>
+                                            </td>
+                                            {activeTab === 'received' && (
+                                                <>
+                                                    <td className="text-xs text-slate-500" dir="ltr">
+                                                        {row.received_at ? new Date(row.received_at).toLocaleString('ar-SA') : '—'}
+                                                    </td>
+                                                    <td className="text-xs font-semibold text-blue-700">{row.distributed_by_name || 'المدير'}</td>
+                                                    {projectConfig?.requires_cards !== false && (
+                                                        <td className="font-mono text-xs text-slate-700 max-w-[180px] truncate" title={row.card_numbers}>
+                                                            {row.card_numbers || '—'}
+                                                        </td>
+                                                    )}
+                                                </>
+                                            )}
+                                        </>
+                                    ) : (
+                                        <>
+                                            <td className="font-mono font-bold text-violet-700 text-base">{row.card_number}</td>
+                                            <td className="text-slate-500">{row.value || '—'}</td>
+                                        </>
+                                    )}
+                                </tr>
+                            ))}
                         </tbody>
                     </table>
                 </div>
-                <div className="bg-gray-50 border-t border-gray-100 p-4 text-sm text-gray-500 flex justify-between items-center">
-                    <span>إجمالي النتائج المعروضة: <b>{filteredData.length}</b></span>
+                <div className="bg-slate-50 border-t border-slate-100 px-5 py-3 text-sm text-slate-500 flex justify-between items-center">
+                    <span>إجمالي النتائج: <b className="text-slate-700">{formatNumber(filteredData.length)}</b></span>
                 </div>
             </div>
         </div>

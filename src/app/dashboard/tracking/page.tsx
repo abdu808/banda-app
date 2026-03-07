@@ -2,7 +2,8 @@
 
 import { useState } from 'react';
 import { supabase } from '@/lib/supabase';
-import { Search, CreditCard, User, Calendar, Folder } from 'lucide-react';
+import { Search, CreditCard, User, Calendar, Folder, AlertCircle } from 'lucide-react';
+import { Spinner } from '@/components/ui/Spinner';
 
 interface TrackingData {
     card_number: string;
@@ -22,112 +23,105 @@ export default function TrackingPage() {
     const handleSearch = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!searchQuery.trim()) return;
-
         setLoading(true);
         setSearched(true);
         setResult(null);
-
-        const { data, error } = await supabase
+        const { data } = await supabase
             .from('cards')
-            .select(`
-        card_number, status, value, assigned_at,
-        projects ( name ),
-        beneficiaries ( name, identity_number, phone_number )
-      `)
-            .eq('card_number', searchQuery)
+            .select('card_number, status, value, assigned_at, projects ( name ), beneficiaries ( name, identity_number, phone_number )')
+            .eq('card_number', searchQuery.trim())
             .single();
-
-        if (data) {
-            setResult(data as any);
-        }
-
+        if (data) setResult(data as any);
         setLoading(false);
     };
 
     return (
-        <div className="max-w-2xl mx-auto space-y-8">
-            <div className="text-center">
-                <h1 className="text-3xl font-bold text-gray-900 mb-2">الاستعلام والتتبع</h1>
-                <p className="text-gray-500">ابحث برقم البطاقة لمعرفة حالة تسليمها وهوية المستفيد</p>
+        <div className="max-w-xl mx-auto space-y-6">
+            <div>
+                <h1 className="text-2xl font-bold text-slate-900">الاستعلام والتتبع</h1>
+                <p className="text-slate-500 mt-0.5 text-sm">ابحث برقم البطاقة لمعرفة حالة تسليمها وهوية المستفيد</p>
             </div>
 
-            <form onSubmit={handleSearch} className="relative">
-                <div className="absolute inset-y-0 right-0 pr-4 flex items-center pointer-events-none">
-                    <Search className="h-6 w-6 text-gray-400" />
+            <form onSubmit={handleSearch} className="relative flex gap-2">
+                <div className="relative flex-1">
+                    <Search className="h-5 w-5 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2" />
+                    <input
+                        type="text"
+                        required
+                        placeholder="أدخل رقم البطاقة..."
+                        value={searchQuery}
+                        onChange={e => setSearchQuery(e.target.value)}
+                        className="input-field pr-10 py-3 text-center font-mono tracking-widest text-lg"
+                        dir="ltr"
+                    />
                 </div>
-                <input
-                    type="text"
-                    required
-                    placeholder="أدخل رقم البطاقة هنا..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="block w-full pl-3 pr-14 py-4 border-2 border-gray-200 rounded-2xl focus:ring-blue-500 focus:border-blue-500 sm:text-lg text-center font-mono shadow-sm transition-colors"
-                    dir="ltr"
-                />
                 <button
                     type="submit"
-                    disabled={loading || !searchQuery}
-                    className="absolute left-2 top-2 bottom-2 bg-blue-600 text-white px-6 rounded-xl font-bold hover:bg-blue-700 disabled:opacity-50 transition-colors"
+                    disabled={loading || !searchQuery.trim()}
+                    className="bg-blue-600 text-white px-6 py-3 rounded-[10px] font-bold hover:bg-blue-700 disabled:opacity-50 transition-colors flex items-center gap-2 flex-shrink-0"
                 >
-                    {loading ? 'بحث...' : 'تتبع'}
+                    {loading ? <Spinner size="sm" /> : 'تتبع'}
                 </button>
             </form>
 
             {searched && !loading && !result && (
-                <div className="bg-red-50 text-red-700 p-6 rounded-2xl text-center border border-red-100">
-                    <p className="font-bold text-lg mb-1">لم يتم العثور على البطاقة</p>
-                    <p className="text-sm">تأكد من رقم البطاقة، قد لا تكون مسجلة في قاعدة البيانات.</p>
+                <div className="bg-red-50 text-red-700 p-5 rounded-xl text-center border border-red-100 flex flex-col items-center gap-2">
+                    <AlertCircle className="w-8 h-8 text-red-400" />
+                    <p className="font-bold">لم يتم العثور على البطاقة</p>
+                    <p className="text-sm text-red-500">تأكد من رقم البطاقة، قد لا تكون مسجلة في قاعدة البيانات.</p>
                 </div>
             )}
 
             {result && (
-                <div className="bg-white rounded-3xl shadow-lg border border-gray-100 overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-500">
-                    <div className="bg-gray-50 border-b border-gray-100 px-6 py-4 flex items-center justify-between">
-                        <div className="flex items-center gap-3 text-gray-900 font-mono font-bold text-xl">
-                            <CreditCard className="w-6 h-6 text-gray-400" />
+                <div className="card overflow-hidden animate-scale-in">
+                    <div className="bg-slate-50 border-b border-slate-100 px-5 py-4 flex items-center justify-between">
+                        <div className="flex items-center gap-2 text-slate-800 font-mono font-bold text-lg">
+                            <CreditCard className="w-5 h-5 text-slate-400" />
                             {result.card_number}
                         </div>
-                        <span
-                            className={`px-3 py-1 rounded-full text-sm font-bold ${result.status === 'used' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'
-                                }`}
-                        >
+                        <span className={`px-3 py-1 rounded-full text-sm font-semibold ${result.status === 'used' ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-100 text-blue-700'}`}>
                             {result.status === 'used' ? 'تم التسليم' : 'متاحة (لم تُسلم)'}
                         </span>
                     </div>
 
-                    <div className="p-6 space-y-6">
+                    <div className="p-5 space-y-5">
                         <div className="flex items-start gap-4">
-                            <div className="p-3 bg-gray-100 rounded-xl text-gray-500">
-                                <Folder className="w-6 h-6" />
+                            <div className="p-2.5 bg-slate-100 rounded-xl text-slate-500 flex-shrink-0">
+                                <Folder className="w-5 h-5" />
                             </div>
                             <div>
-                                <p className="text-sm font-bold text-gray-500 mb-1">المشروع التابعة له</p>
-                                <p className="text-lg font-bold text-gray-900">{result.projects?.name || 'غير معروف'}</p>
-                                <p className="text-sm text-gray-500">قيمة البطاقة: {result.value} ريال</p>
+                                <p className="text-xs font-semibold text-slate-500 mb-0.5 uppercase tracking-wide">المشروع التابعة له</p>
+                                <p className="font-bold text-slate-900">{result.projects?.name || 'غير معروف'}</p>
+                                {result.value > 0 && <p className="text-xs text-slate-400 mt-0.5">قيمة البطاقة: {result.value} ريال</p>}
                             </div>
                         </div>
 
                         {result.status === 'used' && result.beneficiaries && (
                             <>
-                                <div className="w-full h-px bg-gray-100 my-4 border-dashed border-b-2"></div>
+                                <div className="border-t border-slate-100" />
                                 <div className="flex items-start gap-4">
-                                    <div className="p-3 bg-green-50 rounded-xl text-green-600">
-                                        <User className="w-6 h-6" />
+                                    <div className="p-2.5 bg-emerald-50 rounded-xl text-emerald-600 flex-shrink-0">
+                                        <User className="w-5 h-5" />
                                     </div>
                                     <div>
-                                        <p className="text-sm font-bold text-green-600 mb-1">المستفيد المسجلة باسمه</p>
-                                        <p className="text-xl font-bold text-gray-900 mb-1">{result.beneficiaries.name}</p>
-                                        <p className="text-sm text-gray-500 font-mono">هوية: {result.beneficiaries.identity_number} {result.beneficiaries.phone_number && `| جوال: ${result.beneficiaries.phone_number}`}</p>
+                                        <p className="text-xs font-semibold text-emerald-600 mb-0.5 uppercase tracking-wide">المستفيد المسجل</p>
+                                        <p className="font-bold text-slate-900 text-lg">{result.beneficiaries.name}</p>
+                                        <p className="text-sm text-slate-500 font-mono mt-0.5">
+                                            هوية: {result.beneficiaries.identity_number}
+                                            {result.beneficiaries.phone_number && ` | جوال: ${result.beneficiaries.phone_number}`}
+                                        </p>
                                     </div>
                                 </div>
 
                                 <div className="flex items-start gap-4">
-                                    <div className="p-3 bg-gray-50 rounded-xl text-gray-400">
-                                        <Calendar className="w-6 h-6" />
+                                    <div className="p-2.5 bg-slate-50 rounded-xl text-slate-400 flex-shrink-0">
+                                        <Calendar className="w-5 h-5" />
                                     </div>
                                     <div>
-                                        <p className="text-sm font-bold text-gray-500 mb-1">وقت وتاريخ التسليم</p>
-                                        <p className="text-gray-900">{result.assigned_at ? new Date(result.assigned_at).toLocaleString('ar-SA') : 'غير متوفر'}</p>
+                                        <p className="text-xs font-semibold text-slate-500 mb-0.5 uppercase tracking-wide">تاريخ التسليم</p>
+                                        <p className="text-slate-800 font-medium">
+                                            {result.assigned_at ? new Date(result.assigned_at).toLocaleString('ar-SA') : 'غير متوفر'}
+                                        </p>
                                     </div>
                                 </div>
                             </>
