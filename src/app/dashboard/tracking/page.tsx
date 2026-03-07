@@ -120,7 +120,7 @@ export default function TrackingPage() {
                                     <div>
                                         <p className="text-xs font-semibold text-slate-500 mb-0.5 uppercase tracking-wide">تاريخ التسليم</p>
                                         <p className="text-slate-800 font-medium">
-                                            {result.assigned_at ? new Date(result.assigned_at).toLocaleString('ar-SA') : 'غير متوفر'}
+                                            {result.assigned_at ? new Date(result.assigned_at).toLocaleString('en-GB') : 'غير متوفر'}
                                         </p>
                                     </div>
                                 </div>

@@ -28,7 +28,7 @@ export function getInitials(name: string, email?: string): string {
 /** تنسيق التاريخ بالعربية */
 export function formatArabicDate(dateStr: string, options?: Intl.DateTimeFormatOptions): string {
     if (!dateStr) return '';
-    return new Date(dateStr).toLocaleDateString('ar-SA', options ?? {
+    return new Date(dateStr).toLocaleDateString('en-GB', options ?? {
         year: 'numeric',
         month: 'long',
         day: 'numeric',
@@ -38,7 +38,7 @@ export function formatArabicDate(dateStr: string, options?: Intl.DateTimeFormatO
 /** تنسيق التاريخ والوقت بالعربية */
 export function formatArabicDateTime(dateStr: string): string {
     if (!dateStr) return '';
-    return new Date(dateStr).toLocaleString('ar-SA', {
+    return new Date(dateStr).toLocaleString('en-GB', {
         year: 'numeric',
         month: 'short',
         day: 'numeric',
@@ -55,7 +55,7 @@ export function calcPercent(received: number, total: number): number {
 
 /** تنسيق الأرقام بالعربية */
 export function formatNumber(n: number): string {
-    return n.toLocaleString('ar-SA');
+    return n.toLocaleString('en-US');
 }
 
 /** لون Avatar تلقائي بناءً على النص */

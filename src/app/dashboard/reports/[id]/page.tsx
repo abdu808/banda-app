@@ -123,7 +123,7 @@ export default function ComprehensiveReportPage() {
                 'اسم المستفيد': b.name,
                 'الهوية': b.identity_number,
                 'الجوال': b.phone_number || '',
-                'تاريخ الاستلام': b.received_at ? new Date(b.received_at).toLocaleString('ar-SA') : '',
+                'تاريخ الاستلام': b.received_at ? new Date(b.received_at).toLocaleString('en-GB') : '',
                 'الموزع': b.distributed_by_name || 'المدير',
                 'الكمية': b.assigned_cards_count || projectConfig?.cards_per_beneficiary || 0,
                 'أرقام البطاقات': b.card_numbers || 'لا توجد',
@@ -280,7 +280,7 @@ export default function ComprehensiveReportPage() {
                                             {activeTab === 'received' && (
                                                 <>
                                                     <td className="text-xs text-slate-500" dir="ltr">
-                                                        {row.received_at ? new Date(row.received_at).toLocaleString('ar-SA') : '—'}
+                                                        {row.received_at ? new Date(row.received_at).toLocaleString('en-GB') : '—'}
                                                     </td>
                                                     <td className="text-xs font-semibold text-blue-700">{row.distributed_by_name || 'المدير'}</td>
                                                     {projectConfig?.requires_cards !== false && (

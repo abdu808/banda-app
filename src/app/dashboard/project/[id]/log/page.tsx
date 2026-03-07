@@ -77,7 +77,7 @@ export default function ProjectLogPage() {
             'اسم المستفيد': b.name,
             'الهوية': b.identity_number,
             'الجوال': b.phone_number || '',
-            'تاريخ الاستلام': new Date(b.received_at).toLocaleString('ar-SA'),
+            'تاريخ الاستلام': new Date(b.received_at).toLocaleString('en-GB'),
             'عدد البطاقات': b.assigned_cards_count || projectConfig?.cards_per_beneficiary || 0,
             'أرقام البطاقات': b.card_numbers || 'لا توجد',
         }));
@@ -161,7 +161,7 @@ export default function ProjectLogPage() {
                                     <td className="font-mono text-slate-500">{row.identity_number}</td>
                                     <td dir="ltr" className="text-slate-500">{row.phone_number || '—'}</td>
                                     <td className="text-xs text-slate-500" dir="ltr">
-                                        {new Date(row.received_at).toLocaleString('ar-SA')}
+                                        {new Date(row.received_at).toLocaleString('en-GB')}
                                     </td>
                                     <td className="text-center">
                                         <span className="inline-block px-2.5 py-0.5 rounded-md text-xs font-bold bg-blue-100 text-blue-800">

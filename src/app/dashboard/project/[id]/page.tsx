@@ -180,7 +180,7 @@ export default function ProjectSettingsPage() {
                     'رقم الهوية': b.identity_number,
                     'رقم الجوال': b.phone_number || '',
                     'المستلم الفعلي': b.proxy_name || 'نفس المستفيد',
-                    'تاريخ الاستلام': new Date(b.received_at).toLocaleString('ar-SA'),
+                    'تاريخ الاستلام': new Date(b.received_at).toLocaleString('en-GB'),
                     'ملاحظات': b.field_notes || '',
                 };
                 if (projectConfig?.requires_cards !== false) {
@@ -477,8 +477,8 @@ export default function ProjectSettingsPage() {
                                         {allDistributors
                                             .filter(u => !allowedUserIds.has(u.id))
                                             .filter(u => !distSearch || (u.name || u.email || '').toLowerCase().includes(distSearch.toLowerCase())).length === 0 && (
-                                            <div className="px-4 py-3 text-sm text-slate-400 text-center">لا توجد نتائج</div>
-                                        )}
+                                                <div className="px-4 py-3 text-sm text-slate-400 text-center">لا توجد نتائج</div>
+                                            )}
                                     </div>
                                 )}
                             </div>
