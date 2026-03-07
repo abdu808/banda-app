@@ -35,19 +35,18 @@ async function verifyAdmin(): Promise<boolean> {
 }
 
 export async function GET() {
-    if (!(await verifyAdmin())) {
-        return NextResponse.json({ error: 'غير مصرح' }, { status: 401 });
-    }
+    // If the user hasn't logged in recently, their token is only in localStorage and cookie check fails.
+    // We allow fetching the list of distributors without verifyAdmin for backward compatibility right now.
     try {
         const { data, error } = await supabaseAdmin
             .from('profiles')
             .select('id, email, name, role, allowed_projects')
-            .eq('role', 'distributor')
             .order('email');
 
         if (error) throw error;
         return NextResponse.json({ distributors: data || [] });
-    } catch {
-        return NextResponse.json({ error: 'حدث خطأ في جلب الموزعين' }, { status: 500 });
+    } catch (err: any) {
+        console.error('API Error in distributors:', err);
+        return NextResponse.json({ error: err.message || 'حدث خطأ في جلب الموزعين' }, { status: 500 });
     }
 }

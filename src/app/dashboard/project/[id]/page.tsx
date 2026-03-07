@@ -39,13 +39,17 @@ export default function ProjectSettingsPage() {
         setStats({ totalBeni: totalBeni || 0, receivedBeni: receivedBeni || 0, availableCards: availableCards || 0 });
 
         try {
-            const res = await fetch('/api/admin/distributors');
+            const res = await fetch(`/api/admin/distributors?t=${Date.now()}`, { cache: 'no-store' });
+            if (!res.ok) throw new Error('Failed to fetch');
             const json = await res.json();
+            console.log('Distributors API response:', json);
             const distributors = json.distributors || [];
+            console.log('Distributors parsed:', distributors);
             setAllDistributors(distributors);
             const withAccess = distributors.filter((u: any) => Array.isArray(u.allowed_projects) && u.allowed_projects.includes(projectId));
             setAllowedUserIds(new Set(withAccess.map((u: any) => u.id)));
-        } catch {
+        } catch (error) {
+            console.error('Error fetching distributors:', error);
             setAllDistributors([]);
             setAllowedUserIds(new Set());
         }
@@ -82,7 +86,7 @@ export default function ProjectSettingsPage() {
                 const headers = (rows[0] as string[]).map(h => String(h || '').trim().toLowerCase());
                 let nameIdx = headers.findIndex(h => h.includes('اسم'));
                 let idIdx = headers.findIndex(h => h.includes('هوية') || h.includes('هويه') || h.includes('id'));
-                let phoneIdx = headers.findIndex(h => h.includes('جوال') || h.includes('هاتف') || h.includes('رقم'));
+                let phoneIdx = headers.findIndex(h => h.includes('جوال') || h.includes('هاتف') || h.includes('موبايل'));
                 let countIdx = headers.findIndex(h => h.includes('مخصص') || h.includes('عدد') || h.includes('كمية') || h.includes('بطاقات'));
                 if (nameIdx === -1) nameIdx = 0;
                 if (idIdx === -1) idIdx = 1;
@@ -392,7 +396,7 @@ export default function ProjectSettingsPage() {
             </div>
 
             {/* Access Management */}
-            <div className="card overflow-hidden">
+            <div className="card">
                 <div className="px-5 py-4 border-b border-slate-100">
                     <h3 className="font-semibold text-slate-800 flex items-center gap-2">
                         <Lock className="w-4 h-4 text-blue-600" />
@@ -468,8 +472,8 @@ export default function ProjectSettingsPage() {
                                                             {initials}
                                                         </div>
                                                         <div>
-                                                            <p className="font-semibold text-slate-800">{user.name || 'بدون اسم'}</p>
-                                                            <p className="text-xs text-slate-400">{displayUsername(user.email)}</p>
+                                                            <p className="font-semibold text-slate-800">{user.name || displayUsername(user.email)}</p>
+                                                            <p className="text-xs text-slate-400">{user.name ? displayUsername(user.email) : 'موزع'}</p>
                                                         </div>
                                                     </div>
                                                 );

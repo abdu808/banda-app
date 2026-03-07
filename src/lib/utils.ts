@@ -9,24 +9,25 @@ export function normalizeEmail(input: string): string {
 }
 
 /** عرض اسم المستخدم المختصر (بدون @banda.app) */
-export function displayUsername(email: string): string {
-    return email?.endsWith(`@${DEFAULT_EMAIL_DOMAIN}`)
+export function displayUsername(email?: string): string {
+    if (!email) return '---';
+    return email.endsWith(`@${DEFAULT_EMAIL_DOMAIN}`)
         ? email.replace(`@${DEFAULT_EMAIL_DOMAIN}`, '')
         : email;
 }
 
 /** الأحرف الأولى للاسم للـ avatar */
-export function getInitials(name: string, email?: string): string {
+export function getInitials(name?: string, email?: string): string {
     const source = name || email || '?';
     const parts = source.split(/[\s@]/);
-    if (parts.length >= 2) {
+    if (parts.length >= 2 && parts[0] && parts[1]) {
         return (parts[0][0] + parts[1][0]).toUpperCase();
     }
     return source.slice(0, 2).toUpperCase();
 }
 
 /** تنسيق التاريخ بالعربية */
-export function formatArabicDate(dateStr: string, options?: Intl.DateTimeFormatOptions): string {
+export function formatArabicDate(dateStr?: string, options?: Intl.DateTimeFormatOptions): string {
     if (!dateStr) return '';
     return new Date(dateStr).toLocaleDateString('en-GB', options ?? {
         year: 'numeric',
@@ -36,7 +37,7 @@ export function formatArabicDate(dateStr: string, options?: Intl.DateTimeFormatO
 }
 
 /** تنسيق التاريخ والوقت بالعربية */
-export function formatArabicDateTime(dateStr: string): string {
+export function formatArabicDateTime(dateStr?: string): string {
     if (!dateStr) return '';
     return new Date(dateStr).toLocaleString('en-GB', {
         year: 'numeric',
@@ -59,7 +60,8 @@ export function formatNumber(n: number): string {
 }
 
 /** لون Avatar تلقائي بناءً على النص */
-export function avatarColor(str: string): string {
+export function avatarColor(str?: string): string {
+    if (!str) return 'bg-slate-400';
     const colors = [
         'bg-blue-500', 'bg-violet-500', 'bg-emerald-500',
         'bg-amber-500', 'bg-rose-500', 'bg-cyan-500', 'bg-indigo-500',
