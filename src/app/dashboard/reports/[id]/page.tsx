@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useParams } from 'next/navigation';
-import { Search, FileDown, ArrowUpDown, CheckCircle, Clock, CreditCard, Users } from 'lucide-react';
+import { Search, FileDown, ArrowUpDown, CheckCircle, Clock, CreditCard, Users, Undo2 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import toast, { Toaster } from 'react-hot-toast';
 import { formatNumber } from '@/lib/utils';
@@ -28,6 +28,8 @@ export default function ComprehensiveReportPage() {
     const [searchQuery, setSearchQuery] = useState('');
     const [sortField, setSortField] = useState('name');
     const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+
+    const [revertingId, setRevertingId] = useState<string | null>(null);
 
     useEffect(() => {
         fetchData();
@@ -65,10 +67,10 @@ export default function ComprehensiveReportPage() {
             if (projError) throw projError;
             setProjectConfig(proj);
 
-            const receivedData = await fetchAllRecords('beneficiaries', 'id, name, identity_number, phone_number, received_at, assigned_cards_count, distributed_by_name, cards ( card_number )', { project_id: projectId as string, status: 'received' });
+            const receivedData = await fetchAllRecords('beneficiaries', 'id, name, identity_number, file_number, phone_number, received_at, assigned_cards_count, distributed_by_name, cards ( card_number )', { project_id: projectId as string, status: 'received' });
             setReceivedBeni((receivedData || []).map(b => ({ ...b, card_numbers: b.cards ? b.cards.map((c: any) => c.card_number).join(' ، ') : '' })));
 
-            const pendingData = await fetchAllRecords('beneficiaries', 'id, name, identity_number, phone_number, assigned_cards_count', { project_id: projectId as string, status: 'pending' });
+            const pendingData = await fetchAllRecords('beneficiaries', 'id, name, identity_number, file_number, phone_number, assigned_cards_count', { project_id: projectId as string, status: 'pending' });
             setPendingBeni(pendingData || []);
 
             let availableCardsData: any[] = [];
@@ -102,7 +104,11 @@ export default function ComprehensiveReportPage() {
                 if (!searchQuery) return true;
                 const q = searchQuery.toLowerCase();
                 if (activeTab === 'unused_cards') return item.card_number && item.card_number.includes(q);
-                return (item.name && item.name.toLowerCase().includes(q)) || (item.identity_number && item.identity_number.includes(q)) || (item.phone_number && item.phone_number.includes(q)) || (item.card_numbers && item.card_numbers.includes(q));
+                return (item.name && item.name.toLowerCase().includes(q)) ||
+                    (item.identity_number && item.identity_number.includes(q)) ||
+                    (item.file_number && item.file_number.includes(q)) ||
+                    (item.phone_number && item.phone_number.includes(q)) ||
+                    (item.card_numbers && item.card_numbers.includes(q));
             })
             .sort((a, b) => {
                 let cmp = 0;
@@ -122,6 +128,7 @@ export default function ComprehensiveReportPage() {
             dataToExport = filteredData.map(b => ({
                 'اسم المستفيد': b.name,
                 'الهوية': b.identity_number,
+                'رقم الملف': b.file_number || '',
                 'الجوال': b.phone_number || '',
                 'تاريخ الاستلام': b.received_at ? new Date(b.received_at).toLocaleString('en-GB') : '',
                 'الموزع': b.distributed_by_name || 'المدير',
@@ -130,7 +137,13 @@ export default function ComprehensiveReportPage() {
             }));
         } else if (activeTab === 'pending') {
             sheetName = 'المتبقين';
-            dataToExport = filteredData.map(b => ({ 'اسم المستفيد': b.name, 'الهوية': b.identity_number, 'الجوال': b.phone_number || '', 'الكمية المستحقة': b.assigned_cards_count || projectConfig?.cards_per_beneficiary || 0 }));
+            dataToExport = filteredData.map(b => ({
+                'اسم المستفيد': b.name,
+                'الهوية': b.identity_number,
+                'رقم الملف': b.file_number || '',
+                'الجوال': b.phone_number || '',
+                'الكمية المستحقة': b.assigned_cards_count || projectConfig?.cards_per_beneficiary || 0
+            }));
         } else {
             sheetName = 'البطاقات_المتبقية';
             dataToExport = filteredData.map(c => ({ 'رقم البطاقة': c.card_number, 'القيمة': c.value || '-' }));
@@ -139,6 +152,26 @@ export default function ComprehensiveReportPage() {
         const workbook = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
         XLSX.writeFile(workbook, `تقرير_${sheetName}_${projectConfig?.name || 'مشروع'}.xlsx`);
+    };
+
+    const handleUndoHandover = async (beni: any) => {
+        if (!confirm(`هل أنت متأكد من إلغاء تسليم المستفيد "${beni.name}"؟ ستعود حالة المستفيد كـ غير مستلم، وستعود البطاقات لتكون متاحة للتوزيع مرة أخرى.`)) return;
+        setRevertingId(beni.id);
+        try {
+            const res = await fetch('/api/admin/revert-handover', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ beneficiaryId: beni.id, projectId }),
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || 'حدث خطأ في التراجع');
+            toast.success('تم التراجع عن التسليم بنجاح');
+            fetchData();
+        } catch (err: any) {
+            toast.error(err.message || 'فشلت عملية التراجع عن التسليم');
+        } finally {
+            setRevertingId(null);
+        }
     };
 
     const filteredData = getSortedAndFilteredData();
@@ -203,7 +236,7 @@ export default function ComprehensiveReportPage() {
                         <Search className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2" />
                         <input
                             type="text"
-                            placeholder={activeTab === 'unused_cards' ? 'رقم البطاقة...' : 'بحث بالاسم أو الهوية...'}
+                            placeholder={activeTab === 'unused_cards' ? 'رقم البطاقة...' : 'بحث بالاسم، الهوية، أو رقم الملف...'}
                             value={searchQuery}
                             onChange={e => setSearchQuery(e.target.value)}
                             className="input-field pr-9"
@@ -230,6 +263,7 @@ export default function ComprehensiveReportPage() {
                                         اسم المستفيد <SortIcon field="name" />
                                     </th>
                                     <th>رقم الهوية</th>
+                                    <th>رقم الملف</th>
                                     <th>رقم الجوال</th>
                                     <th className="text-center">الكمية</th>
                                     {activeTab === 'received' && (
@@ -239,6 +273,7 @@ export default function ComprehensiveReportPage() {
                                             </th>
                                             <th>الموزع</th>
                                             {projectConfig?.requires_cards !== false && <th>أرقام البطاقات</th>}
+                                            <th className="text-center w-16">إجراء</th>
                                         </>
                                     )}
                                 </tr>
@@ -271,6 +306,7 @@ export default function ComprehensiveReportPage() {
                                         <>
                                             <td className="font-semibold text-slate-900">{row.name}</td>
                                             <td className="font-mono text-slate-500">{row.identity_number}</td>
+                                            <td className="text-slate-500">{row.file_number || '—'}</td>
                                             <td dir="ltr" className="text-slate-500">{row.phone_number || '—'}</td>
                                             <td className="text-center">
                                                 <span className={`inline-block px-2.5 py-0.5 rounded-md text-xs font-bold ${activeTab === 'received' ? 'bg-blue-100 text-blue-800' : 'bg-amber-100 text-amber-800'}`}>
@@ -288,6 +324,20 @@ export default function ComprehensiveReportPage() {
                                                             {row.card_numbers || '—'}
                                                         </td>
                                                     )}
+                                                    <td className="text-center">
+                                                        <button
+                                                            onClick={() => handleUndoHandover(row)}
+                                                            disabled={revertingId === row.id}
+                                                            className="p-1.5 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg transition disabled:opacity-50"
+                                                            title="إلغاء التسليم وإرجاع البطاقات"
+                                                        >
+                                                            {revertingId === row.id ? (
+                                                                <Spinner size="sm" className="w-4 h-4 text-red-500" />
+                                                            ) : (
+                                                                <Undo2 className="w-4 h-4" />
+                                                            )}
+                                                        </button>
+                                                    </td>
                                                 </>
                                             )}
                                         </>

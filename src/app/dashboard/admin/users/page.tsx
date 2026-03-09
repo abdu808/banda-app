@@ -176,8 +176,8 @@ export default function AdminUsersPage() {
                                             value={user.role}
                                             onChange={e => handleChangeRole(user.id, e.target.value)}
                                             className={`text-xs font-semibold px-2.5 py-1.5 rounded-lg border cursor-pointer transition ${isAdmin
-                                                    ? 'bg-blue-50 text-blue-700 border-blue-200'
-                                                    : 'bg-slate-50 text-slate-600 border-slate-200'
+                                                ? 'bg-blue-50 text-blue-700 border-blue-200'
+                                                : 'bg-slate-50 text-slate-600 border-slate-200'
                                                 }`}
                                         >
                                             <option value="distributor">موزع</option>
@@ -217,6 +217,8 @@ export default function AdminUsersPage() {
                                     placeholder="ahmad123"
                                     value={form.username}
                                     onChange={e => setForm(f => ({ ...f, username: e.target.value }))}
+                                    pattern="[a-zA-Z0-9_.@+-]+"
+                                    title="يجب أن يحتوي اسم المستخدم على أحرف إنجليزية وأرقام فقط"
                                     className="input-field"
                                     dir="ltr"
                                 />

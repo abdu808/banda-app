@@ -56,8 +56,8 @@ export default function ProjectSettingsPage() {
     };
 
     const downloadBeneficiaryTemplate = () => {
-        const ws = XLSX.utils.aoa_to_sheet([['الاسم الكامل', 'رقم الهوية', 'رقم الجوال (اختياري)', 'عدد المخصصات (اختياري)']]);
-        ws['!cols'] = [{ wch: 25 }, { wch: 15 }, { wch: 15 }, { wch: 20 }];
+        const ws = XLSX.utils.aoa_to_sheet([['الاسم الكامل', 'رقم الهوية', 'رقم الجوال (اختياري)', 'رقم الملف', 'عدد المخصصات (اختياري)']]);
+        ws['!cols'] = [{ wch: 25 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 20 }];
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, 'المستفيدين');
         XLSX.writeFile(wb, 'نموذج_رفع_المستفيدين.xlsx');
@@ -87,11 +87,13 @@ export default function ProjectSettingsPage() {
                 let nameIdx = headers.findIndex(h => h.includes('اسم'));
                 let idIdx = headers.findIndex(h => h.includes('هوية') || h.includes('هويه') || h.includes('id'));
                 let phoneIdx = headers.findIndex(h => h.includes('جوال') || h.includes('هاتف') || h.includes('موبايل'));
+                let fileNumIdx = headers.findIndex(h => h.includes('ملف') || h.includes('رقم') || h.includes('file'));
                 let countIdx = headers.findIndex(h => h.includes('مخصص') || h.includes('عدد') || h.includes('كمية') || h.includes('بطاقات'));
                 if (nameIdx === -1) nameIdx = 0;
                 if (idIdx === -1) idIdx = 1;
                 if (phoneIdx === -1 && headers.length > 2) phoneIdx = 2;
-                if (countIdx === -1 && headers.length > 3) countIdx = 3;
+                if (fileNumIdx === -1 && headers.length > 3) fileNumIdx = 3;
+                if (countIdx === -1 && headers.length > 4) countIdx = 4;
                 const dataRows = rows.slice(1);
                 const errors: string[] = [];
                 dataRows.forEach((row, index) => {
@@ -111,6 +113,7 @@ export default function ProjectSettingsPage() {
                         name: String(row[nameIdx]).trim(),
                         identity_number: String(row[idIdx]).trim(),
                         phone_number: phoneIdx !== -1 && row[phoneIdx] ? String(row[phoneIdx]).trim() : null,
+                        file_number: fileNumIdx !== -1 && row[fileNumIdx] ? String(row[fileNumIdx]).trim() : null,
                         assigned_cards_count: parsedCount,
                         status: 'pending'
                     };
@@ -174,7 +177,7 @@ export default function ProjectSettingsPage() {
             const toastId = toast.loading('جاري تجهيز التقرير...');
             const { data: beneficiaries, error: bError } = await supabase
                 .from('beneficiaries')
-                .select('id, name, identity_number, phone_number, received_at, proxy_name, field_notes, cards ( card_number, value )')
+                .select('id, name, identity_number, file_number, phone_number, received_at, proxy_name, field_notes, cards ( card_number, value )')
                 .eq('project_id', projectId)
                 .eq('status', 'received');
             if (bError) throw bError;
@@ -182,6 +185,7 @@ export default function ProjectSettingsPage() {
                 const rowData: any = {
                     'اسم المستفيد': b.name,
                     'رقم الهوية': b.identity_number,
+                    'رقم الملف': b.file_number || '',
                     'رقم الجوال': b.phone_number || '',
                     'المستلم الفعلي': b.proxy_name || 'نفس المستفيد',
                     'تاريخ الاستلام': new Date(b.received_at).toLocaleString('en-GB'),
@@ -347,7 +351,7 @@ export default function ProjectSettingsPage() {
                         </button>
                     </div>
                     <p className="text-xs text-slate-400 bg-slate-50 rounded-lg p-3 border border-slate-100 leading-relaxed">
-                        الأعمدة: الاسم الكامل — رقم الهوية — رقم الجوال (اختياري) — عدد المخصصات (اختياري). النظام يتعرف على الأعمدة تلقائياً.
+                        الأعمدة: الاسم الكامل — رقم الهوية — رقم الجوال — رقم الملف — عدد المخصصات. النظام يتعرف على الأعمدة تلقائياً.
                     </p>
                     <label className={`relative flex flex-col items-center justify-center border-2 border-dashed rounded-xl p-6 cursor-pointer transition-colors ${isUploading ? 'border-blue-300 bg-blue-50 cursor-not-allowed' : 'border-slate-200 hover:border-blue-300 hover:bg-blue-50/30'}`}>
                         <input type="file" accept=".xlsx,.xls" onChange={handleUploadBeneficiaries} disabled={isUploading} className="absolute inset-0 opacity-0 cursor-pointer disabled:cursor-not-allowed" />

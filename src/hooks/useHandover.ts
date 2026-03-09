@@ -9,6 +9,7 @@ interface Beneficiary {
     id: string;
     name: string;
     identity_number: string;
+    file_number: string | null;
     phone_number: string | null;
     status: string;
     assigned_cards_count: number | null;
@@ -72,9 +73,9 @@ export function useHandover(projectId: string | string[]) {
         const search = async () => {
             const { data, error } = await supabase
                 .from('beneficiaries')
-                .select('id, name, identity_number, phone_number, status, assigned_cards_count')
+                .select('id, name, identity_number, file_number, phone_number, status, assigned_cards_count')
                 .eq('project_id', pid)
-                .or(`name.ilike.%${searchQuery}%,identity_number.ilike.${searchQuery}%,phone_number.ilike.${searchQuery}%`)
+                .or(`name.ilike.%${searchQuery}%,identity_number.ilike.${searchQuery}%,file_number.ilike.${searchQuery}%,phone_number.ilike.${searchQuery}%`)
                 .limit(10);
             if (!error && data) setBeneficiaries(data);
         };

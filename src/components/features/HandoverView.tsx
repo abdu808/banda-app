@@ -162,7 +162,7 @@ export function HandoverView({ projectId, backHref }: HandoverViewProps) {
                                 autoFocus
                                 type="text"
                                 className="input-field pl-4 pr-11 py-3.5 text-base"
-                                placeholder="ابحث بالاسم، رقم الهوية، أو الجوال..."
+                                placeholder="ابحث بالاسم، رقم الهوية، رقم الملف، أو الجوال..."
                                 value={searchQuery}
                                 onChange={e => setSearchQuery(e.target.value)}
                                 onKeyDown={e => {
@@ -181,16 +181,16 @@ export function HandoverView({ projectId, backHref }: HandoverViewProps) {
                                     <div
                                         key={beni.id}
                                         onClick={() => selectBeneficiary(beni)}
-                                        className={`p-4 flex items-center justify-between cursor-pointer transition-colors ${
-                                            beni.status === 'received'
+                                        className={`p-4 flex items-center justify-between cursor-pointer transition-colors ${beni.status === 'received'
                                                 ? 'opacity-50 bg-slate-50 cursor-not-allowed'
                                                 : 'hover:bg-blue-50/60 active:bg-blue-50'
-                                        }`}
+                                            }`}
                                     >
                                         <div>
                                             <p className="font-bold text-slate-900">{beni.name}</p>
                                             <div className="text-sm text-slate-500 mt-0.5 flex gap-3">
                                                 <span>الهوية: <strong className="text-slate-700">{beni.identity_number}</strong></span>
+                                                <span>الملف: <strong className="text-slate-700">{beni.file_number || '—'}</strong></span>
                                                 {beni.phone_number && <span dir="ltr">{beni.phone_number}</span>}
                                             </div>
                                         </div>
@@ -221,6 +221,7 @@ export function HandoverView({ projectId, backHref }: HandoverViewProps) {
                                 <h3 className="font-black text-blue-900 text-xl">{selectedBeni.name}</h3>
                                 <div className="flex gap-4 text-sm text-blue-700 mt-1.5">
                                     <span>الهوية: <strong>{selectedBeni.identity_number}</strong></span>
+                                    <span>رقم الملف: <strong>{selectedBeni.file_number || '—'}</strong></span>
                                     {selectedBeni.phone_number && <span dir="ltr">{selectedBeni.phone_number}</span>}
                                 </div>
                             </div>
@@ -247,11 +248,10 @@ export function HandoverView({ projectId, backHref }: HandoverViewProps) {
                                                         autoFocus={index === 0}
                                                         type="text"
                                                         required
-                                                        className={`block w-full pl-10 pr-9 py-3.5 border rounded-xl font-mono text-center text-xl font-bold tracking-widest transition h-14 focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                                                            card.trim()
+                                                        className={`block w-full pl-10 pr-9 py-3.5 border rounded-xl font-mono text-center text-xl font-bold tracking-widest transition h-14 focus:ring-2 focus:ring-blue-500 focus:border-transparent ${card.trim()
                                                                 ? 'border-emerald-400 bg-emerald-50 text-emerald-800'
                                                                 : 'border-slate-300 bg-white'
-                                                        }`}
+                                                            }`}
                                                         placeholder="امسح الباركود"
                                                         value={card}
                                                         onChange={e => handleCardChange(index, e.target.value)}
